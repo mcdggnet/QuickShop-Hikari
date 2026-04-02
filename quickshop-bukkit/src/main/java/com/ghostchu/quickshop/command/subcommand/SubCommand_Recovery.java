@@ -8,14 +8,14 @@ import com.ghostchu.quickshop.database.SimpleDatabaseHelperV2;
 import com.ghostchu.quickshop.database.TableZipCsvBackup;
 import com.ghostchu.quickshop.util.Util;
 import com.ghostchu.quickshop.util.logger.Log;
-import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 
-public class SubCommand_Recovery implements CommandHandler<ConsoleCommandSender> {
+public class SubCommand_Recovery implements CommandHandler<CommandSender> {
 
   private final QuickShop plugin;
 
@@ -25,7 +25,7 @@ public class SubCommand_Recovery implements CommandHandler<ConsoleCommandSender>
   }
 
   @Override
-  public void onCommand(@NotNull final ConsoleCommandSender sender, @NotNull final String commandLabel, @NotNull final CommandParser parser) {
+  public void onCommand(@NotNull final CommandSender sender, @NotNull final String commandLabel, @NotNull final CommandParser parser) {
 
     final File file = new File(plugin.getDataFolder(), "recovery.zip");
     if(!file.exists()) {

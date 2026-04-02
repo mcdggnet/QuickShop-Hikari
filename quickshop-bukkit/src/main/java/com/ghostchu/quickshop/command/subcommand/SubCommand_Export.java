@@ -7,14 +7,14 @@ import com.ghostchu.quickshop.database.DatabaseIOUtil;
 import com.ghostchu.quickshop.database.SimpleDatabaseHelperV2;
 import com.ghostchu.quickshop.database.TableZipCsvBackup;
 import com.ghostchu.quickshop.util.Util;
-import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 
-public class SubCommand_Export implements CommandHandler<ConsoleCommandSender> {
+public class SubCommand_Export implements CommandHandler<CommandSender> {
 
   private final QuickShop plugin;
 
@@ -24,7 +24,7 @@ public class SubCommand_Export implements CommandHandler<ConsoleCommandSender> {
   }
 
   @Override
-  public synchronized void onCommand(@NotNull final ConsoleCommandSender sender, @NotNull final String commandLabel, @NotNull final CommandParser parser) {
+  public synchronized void onCommand(@NotNull final CommandSender sender, @NotNull final String commandLabel, @NotNull final CommandParser parser) {
 
     plugin.text().of(sender, "exporting-database").send();
     final File file = new File(QuickShop.getInstance().getDataFolder(), "export-" + System.currentTimeMillis() + ".zip");
