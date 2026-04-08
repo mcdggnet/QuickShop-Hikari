@@ -285,6 +285,9 @@ public class Util {
     if(!isShoppables(b.getType())) {
       return false;
     }
+    if(!isLoaded(b.getLocation())) {
+      return false;
+    }
     final BlockState bs = b.getState(false);
     final boolean container = bs instanceof InventoryHolder;
     if(!container) {

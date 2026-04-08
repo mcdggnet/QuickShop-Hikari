@@ -145,6 +145,11 @@ public class ContainerShop implements Shop, Reloadable {
   @NotNull
   private BenefitProvider benefit;
 
+  @EqualsAndHashCode.Exclude
+  private volatile int lastKnownStock = -2; // -2 = uninitialized
+  @EqualsAndHashCode.Exclude
+  private volatile int lastKnownSpace = -2;
+
   //updating objects
   private final AtomicBoolean updatingAtomic = new AtomicBoolean(false);
   private volatile CompletableFuture<Void> inFlightUpdate;
@@ -657,24 +662,31 @@ public class ContainerShop implements Shop, Reloadable {
   public int getRemainingSpace() {
 
     if(this.unlimited) {
-
       return -1;
     }
 
-    if(Bukkit.isPrimaryThread()) {
-
+    if(Util.isLoaded(this.location) && Bukkit.isPrimaryThread()) {
       if(this.getInventory() == null) {
         Log.debug("Failed to calc RemainingSpace for shop " + this + ": Inventory null.");
         return 0;
       }
-
       final int space = Util.countSpace(this.getInventory(), this);
+      this.lastKnownSpace = space;
       new ShopInventoryCalculateEvent(this, space, -1).callEvent();
       Log.debug("Space count is: " + space);
       return space;
-    } else {
+    }
 
-      return plugin.getShopManager().queryShopInventoryCacheInDatabase(this).join().getSpace();
+    // Chunk not loaded or not on primary thread - use cached value
+    if(this.lastKnownSpace >= 0) {
+      return this.lastKnownSpace;
+    }
+
+    // Last resort: DB cache (bypass ShopManager wrapper which enforces async-only)
+    try {
+      return plugin.getDatabaseHelper().queryInventoryCache(this.getShopId()).join().getSpace();
+    } catch(final Exception e) {
+      return 0;
     }
   }
 
@@ -690,35 +702,27 @@ public class ContainerShop implements Shop, Reloadable {
       return -1;
     }
 
-    if(Bukkit.getServer().isOwnedByCurrentRegion(location)) {
-
+    if(Util.isLoaded(this.location) && Bukkit.getServer().isOwnedByCurrentRegion(location)) {
       if(this.getInventory() == null) {
         return 0;
       }
       final int stock = Util.countItems(this.getInventory(), this);
+      this.lastKnownStock = stock;
       new ShopInventoryCalculateEvent(this, -1, stock).callEvent();
       return stock;
     }
 
-    final CompletableFuture<Integer> future = new CompletableFuture<>();
+    // Chunk not loaded or wrong region - use cached value
+    if(this.lastKnownStock >= 0) {
+      return this.lastKnownStock;
+    }
 
-    QuickShop.folia()
-      .getScheduler()
-      .runAtLocation(
-        this.location,
-        task->{
-          if(this.getInventory() == null) {
-            future.complete(0);
-            return;
-          }
-
-          final int stock = Util.countItems(this.getInventory(), this);
-          new ShopInventoryCalculateEvent(this, -1, stock).callEvent();
-
-          future.complete(stock);
-        });
-
-    return future.join();
+    // Last resort: DB cache (bypass ShopManager wrapper which enforces async-only)
+    try {
+      return plugin.getDatabaseHelper().queryInventoryCache(this.getShopId()).join().getStock();
+    } catch(final Exception e) {
+      return 0;
+    }
   }
 
   /**
@@ -901,6 +905,9 @@ public class ContainerShop implements Shop, Reloadable {
     blocks[3] = location.getBlock().getRelative(BlockFace.WEST);
     for(final Block b : blocks) {
       if(b == null) {
+        continue;
+      }
+      if(!Util.isLoaded(b.getLocation())) {
         continue;
       }
       final BlockState state = b.getState(false);
@@ -1272,6 +1279,12 @@ public class ContainerShop implements Shop, Reloadable {
       return;
     }
     this.isLoaded = true;
+    // Seed in-memory stock/space cache from DB to avoid sync chunk loads on future queries
+    plugin.getDatabaseHelper().queryInventoryCache(this.getShopId())
+      .thenAccept(cache -> {
+        if(cache.getStock() >= 0) this.lastKnownStock = cache.getStock();
+        if(cache.getSpace() >= 0) this.lastKnownSpace = cache.getSpace();
+      });
     //disable schedule check due to performance issue
     //plugin.getShopContainerWatcher().scheduleCheck(this);
     try(final PerfMonitor ignored = new PerfMonitor("Shop Display Check", Duration.of(1, ChronoUnit.SECONDS))) {

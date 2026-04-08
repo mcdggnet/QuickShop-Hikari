@@ -435,6 +435,9 @@ public abstract class AbstractShopManager implements ShopManager {
           }
         } else {
           // optimize for performance
+          if(!Util.isLoaded(currentBlock.getLocation())) {
+            return null;
+          }
           final BlockState state = currentBlock.getState(false);
           if(!(state instanceof InventoryHolder)) {
             return null;
